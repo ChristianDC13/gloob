@@ -19,9 +19,9 @@ if [[ "$OSTYPE" != "darwin"* ]]; then
     exit 1
 fi
 
-# Get the latest release binary URL
-echo "📦 Fetching latest release..."
-DOWNLOAD_URL="https://github.com/$REPO/releases/latest/download/gloob-macos"
+# Get the binary from the repository
+echo "📦 Fetching latest version..."
+DOWNLOAD_URL="https://raw.githubusercontent.com/$REPO/main/gloob-macos"
 
 # Create temporary directory
 TMP_DIR=$(mktemp -d)

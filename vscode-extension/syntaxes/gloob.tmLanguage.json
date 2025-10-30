@@ -1,0 +1,136 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Gloob",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#objects"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.gloob",
+          "match": "//.*"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.gloob",
+          "match": "\\b(var|const|function|fun|if|else|loop|break|return|import|from|to)\\b"
+        },
+        {
+          "name": "constant.language.gloob",
+          "match": "\\b(true|false|yes|no|on|off|null)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": []
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.gloob",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.gloob",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.gloob",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.gloob",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.gloob",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.gloob",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.logical.gloob",
+          "match": "(&&|\\|\\|)"
+        },
+        {
+          "name": "keyword.operator.assignment.gloob",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.arithmetic.gloob",
+          "match": "(\\+|\\-|\\*|/|%)"
+        }
+      ]
+    },
+    "objects": {
+      "patterns": [
+        {
+          "name": "meta.block.gloob",
+          "begin": "\\{",
+          "end": "\\}",
+          "patterns": [
+            {
+              "include": "$self"
+            },
+            {
+              "name": "punctuation.definition.block.gloob",
+              "match": "[:,\\.]"
+            }
+          ]
+        },
+        {
+          "name": "meta.parens.gloob",
+          "begin": "\\(",
+          "end": "\\)",
+          "patterns": [
+            {
+              "include": "$self"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "scopeName": "source.gloob"
+}
+

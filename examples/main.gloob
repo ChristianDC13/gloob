@@ -1,0 +1,62 @@
+var tasks = []
+var option;
+
+fun showMenu() {
+    println("\n=== TO-DO LIST ===")
+    println("1. Add Task")
+    println("2. Remove Task")
+    println("3. Show Tasks")
+    println("4. Exit")
+    print("Choose an option: ")
+}
+
+fun addTask() {
+    const task = input("Enter task description: ")
+    tasks.push(task)
+    println("Task added!")
+}
+
+fun removeTask() {
+    if tasks.len() == 0 {
+        println("No tasks to remove.")
+        return
+    }
+    loop i from 1 to tasks.len() {
+        println(i, "-", tasks[i])
+    }
+    const idx = number(input("Enter task number to remove: "))
+    if idx >= 1 && idx <= tasks.len() {
+        tasks.remove(idx)
+        println("Task removed!")
+    } else {
+        println("Invalid index.")
+    }
+}
+
+fun showTasks() {
+    println("\n--- Current Tasks ---")
+    if tasks.len() == 0 {
+        println("No tasks yet.")
+        return
+    }
+    loop i from 1 to tasks.len() {
+        println(i, "-", tasks[i])
+    }
+}
+
+loop {
+    showMenu()
+    option = input("")
+    if option == "1" {
+        addTask()
+    } else if option == "2" {
+        removeTask()
+    } else if option == "3" {
+        showTasks()
+    } else if option == "4" {
+        println("Goodbye!")
+        break
+    } else {
+        println("Invalid option. Try again.")
+    }
+}

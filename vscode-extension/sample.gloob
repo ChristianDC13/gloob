@@ -1,0 +1,64 @@
+// This is a sample Gloob program demonstrating syntax highlighting
+
+// Variables
+var name = "Gloob"
+const version = 1.0
+
+// Variables without assignment
+var x
+
+// Loops
+var i = 0
+loop i < 10 {
+    print(i)
+    i = i + 1
+    if i > 5 {
+        break
+    }
+}
+
+// Infinite loop
+loop {
+    print("infinite")
+    break
+}
+
+// Functions
+function greet(name) {
+    return "Hello " + name
+}
+
+// Objects
+var person = {
+    name: "John",
+    age: 30,
+    active: true
+}
+
+print(person.name)
+
+// Boolean values
+var yes = true
+var no = false
+var on = on
+var off = off
+
+// Arithmetic
+var sum = 1 + 2 + 3
+var product = 2 * 3
+var quotient = 10 / 2
+var remainder = 10 % 3
+
+// Comparisons
+var gt = 5 > 3
+var lt = 2 < 4
+var eq = 5 == 5
+var ne = 5 != 3
+
+// Logical operators
+var and = true && false
+var or = true || false
+
+// Null
+var empty = null
+

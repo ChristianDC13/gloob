@@ -1,0 +1,44 @@
+{
+  "name": "gloob-language",
+  "displayName": "Gloob Syntax Language Support",
+  "description": "Syntax highlighting for the Gloob programming language",
+  "version": "0.0.1",
+  "publisher": "ChristianDC13",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChristianDC13/gloob"
+  },
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "keywords": ["language", "syntax", "gloob"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "gloob",
+        "aliases": [
+          "Gloob",
+          "gloob"
+        ],
+        "extensions": [
+          ".gloob"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gloob",
+        "scopeName": "source.gloob",
+        "path": "./syntaxes/gloob.tmLanguage.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "vsce": "^2.15.0"
+  }
+}

@@ -1,0 +1,28 @@
+var score = 0
+var answer;
+const questions = [
+    { q: "What is the capital of France?", a: "paris" },
+    { q: "5 + 7 = ?", a: "12" },
+    { q: "What color do you get mixing red and blue?", a: "purple" }
+]
+
+println("=== QUIZ GAME ===")
+
+loop item from questions {
+    answer = input(item.q + " ")
+    if answer.lower().trim() == item.a {
+        println("Correct!")
+        score = score + 1
+    } else {
+        println("Wrong! Correct answer is:", item.a)
+    }
+}
+
+println("You scored", score, "out of", questions.len())
+if score == questions.len() {
+    println("Perfect score! 🎉")
+} else if score > (questions.len() / 2) {
+    println("Good job!")
+} else {
+    println("Better luck next time!")
+}

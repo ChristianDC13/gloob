@@ -1,0 +1,19 @@
+const n = randInt(100)
+
+var guess = number(input("Guess the number from 1 to 100: "))
+var tries = 1
+loop {
+    if n > guess {
+        print("Noup, it's more than", guess)
+    } else if n < guess {
+        print("Noup, its less than", guess)
+    } else {
+        break
+    }
+    tries = tries + 1
+    guess = number(input("Keep trying: "))
+}
+
+
+print("Perfect!, it was", guess)
+print("Tries:", tries)

@@ -1,6 +1,9 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"gloob-interpreter/internal/lexer"
+)
 
 // NodeType represents the type of an AST node.
 // This is used to identify what kind of language construct a node represents
@@ -107,8 +110,9 @@ func (b *BinaryExpression) String() string {
 // Identifier represents variable and function names.
 // Examples: name, age, calculateSum
 type Identifier struct {
-	Type NodeType `json:"type"` // Node type (always IDENTIFIER)
-	Name string   `json:"name"` // The identifier name
+	Type  NodeType     `json:"type"` // Node type (always IDENTIFIER)
+	Name  string       `json:"name"` // The identifier name
+	Token *lexer.Token `json:"-"`    // Token information for error reporting
 }
 
 func (i *Identifier) NodeType() NodeType {

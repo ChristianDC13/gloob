@@ -2,9 +2,8 @@ package parser
 
 import (
 	"fmt"
-	"gloob-interpreter/internal/colors"
+	"gloob-interpreter/internal/errors"
 	"gloob-interpreter/internal/lexer"
-	"os"
 	"strconv"
 )
 
@@ -12,7 +11,9 @@ import (
 // It converts a stream of tokens into an Abstract Syntax Tree (AST).
 // The parser uses proper operator precedence and handles all language constructs.
 type Parser struct {
-	tokens []lexer.Token // Current stream of tokens to parse
+	tokens     []lexer.Token // Current stream of tokens to parse
+	sourceCode string        // Original source code for error reporting
+	filename   string        // Filename for error reporting
 }
 
 // NewParser creates a new parser instance with the given tokens.
@@ -40,11 +41,15 @@ func (p *Parser) next() lexer.Token {
 func (p *Parser) nextWithExpect(expected lexer.TokenType, message string) lexer.Token {
 	token := p.next()
 	if token.Type != expected {
-		fmt.Printf("%s at line %d\n", message, token.Line)
-		os.Exit(1)
+		p.syntaxError(token, message)
 		return lexer.Token{}
 	}
 	return token
+}
+
+// syntaxError prints a detailed syntax error with file context and exits.
+func (p *Parser) syntaxError(token lexer.Token, message string) {
+	errors.SyntaxError(token, p.sourceCode, message)
 }
 
 // notEOF checks if there are more tokens to parse.
@@ -55,8 +60,17 @@ func (p *Parser) notEOF() bool {
 // ProduceAST is the main entry point for parsing.
 // It takes source code, tokenizes it, and produces a complete AST.
 func (p *Parser) ProduceAST(sourceCode string) *Program {
+	return p.ProduceASTWithFilename(sourceCode, "<stdin>")
+}
+
+// ProduceASTWithFilename is like ProduceAST but allows specifying a filename for error reporting.
+func (p *Parser) ProduceASTWithFilename(sourceCode string, filename string) *Program {
+	// Store source code and filename for error reporting
+	p.sourceCode = sourceCode
+	p.filename = filename
+
 	// First, tokenize the source code
-	p.tokens = lexer.NewLexer(sourceCode).Tokenize()
+	p.tokens = lexer.NewLexer(sourceCode, filename).Tokenize()
 	program := &Program{
 		Statements: []Statement{},
 	}
@@ -112,7 +126,7 @@ func (p *Parser) parseImportStatement() *ImportStatement {
 	}
 }
 func (p *Parser) parseCommentStatement() *Null {
-	for p.at().Type != lexer.TokenTypeNewline {
+	for p.notEOF() && p.at().Type != lexer.TokenTypeNewline {
 		p.next()
 	}
 	return &Null{}
@@ -123,14 +137,15 @@ func (p *Parser) parseCommentStatement() *Null {
 func (p *Parser) parseVariableDeclaration() *VariableDeclaration {
 	// Determine if this is a const or var declaration
 	isConstant := p.next().Type == lexer.TokenTypeConst
-	identifier := p.nextWithExpect(lexer.TokenTypeIdentifier, "An identifier was expected here dude 😎").Literal
+	identifier := p.nextWithExpect(lexer.TokenTypeIdentifier, errors.ErrExpectedIdentifier).Literal
 
-	// Check if this is a declaration without assignment (var x;)
-	if p.at().Type == lexer.TokenTypeSemicolon {
-		p.next()
+	// Check if this is a declaration without assignment (var x; or var x\n)
+	if p.at().Type == lexer.TokenTypeSemicolon || p.at().Type == lexer.TokenTypeNewline {
+		if p.at().Type == lexer.TokenTypeSemicolon {
+			p.next()
+		}
 		if isConstant {
-			fmt.Printf("A constant declaration must have a value 🤔\n")
-			os.Exit(1)
+			p.syntaxError(p.at(), errors.ErrConstMustHaveValue)
 			return nil
 		}
 
@@ -142,7 +157,7 @@ func (p *Parser) parseVariableDeclaration() *VariableDeclaration {
 	}
 
 	// Parse the assignment part
-	p.nextWithExpect(lexer.TokenTypeEqual, "An equal sign was expected here dude 😎")
+	p.nextWithExpect(lexer.TokenTypeEqual, errors.ErrExpectedEqual)
 	value := p.parseExpression()
 
 	// Skip optional semicolon and newlines
@@ -271,9 +286,11 @@ func (p *Parser) parsePrimaryExpression() Expression {
 	tokenType := p.at().Type
 	switch tokenType {
 	case lexer.TokenTypeIdentifier:
+		token := p.next()
 		expr = &Identifier{
-			Type: NodeTypeIdentifier,
-			Name: p.next().Literal,
+			Type:  NodeTypeIdentifier,
+			Name:  token.Literal,
+			Token: &token,
 		}
 	case lexer.TokenTypeNumber:
 		value, err := strconv.ParseFloat(p.next().Literal, 64)
@@ -287,7 +304,7 @@ func (p *Parser) parsePrimaryExpression() Expression {
 	case lexer.TokenTypeOpenParentheses:
 		p.next()
 		expr = p.parseExpression()
-		p.nextWithExpect(lexer.TokenTypeCloseParentheses, "Expected closing parentheses")
+		p.nextWithExpect(lexer.TokenTypeCloseParentheses, errors.ErrExpectedCloseParen)
 	case lexer.TokenTypeNull:
 		p.next()
 		expr = &Null{}
@@ -311,9 +328,7 @@ func (p *Parser) parsePrimaryExpression() Expression {
 	case lexer.TokenTypeOpenSquareBrackets:
 		expr = p.parseArrayExpression()
 	default:
-		fmt.Printf("Unexpected token: '%v' at line %d. Are you sure you typed it correctly? 🤔\n",
-			colors.Red(p.at().Literal), p.at().Line)
-		os.Exit(1)
+		p.syntaxError(p.at(), fmt.Sprintf(errors.ErrUnexpectedToken, p.at().Literal))
 		return nil
 	}
 
@@ -340,19 +355,18 @@ func (p *Parser) parsePostfixExpression(expr Expression) Expression {
 
 func (p *Parser) parseFunctionDeclaration() *FunctionDeclaration {
 	p.next()
-	identifier := p.nextWithExpect(lexer.TokenTypeIdentifier, "Expected function name")
+	identifier := p.nextWithExpect(lexer.TokenTypeIdentifier, errors.ErrExpectedFunctionName)
 	args := p.parseArguments()
 	var params []string
 	for _, arg := range args {
 		if _, ok := arg.(*Identifier); !ok {
-			fmt.Printf("Expected an identifier here 👀\n")
-			os.Exit(1)
+			p.syntaxError(p.at(), errors.ErrExpectedIdentifierParam)
 			return nil
 		}
 		params = append(params, arg.(*Identifier).Name)
 	}
 
-	p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets")
+	p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 	body := p.parseBlock()
 	return &FunctionDeclaration{
 		Identifier: identifier.Literal,
@@ -373,12 +387,12 @@ func (p *Parser) parseBlock() []Statement {
 		statement := p.parseStatement()
 		statements = append(statements, statement)
 	}
-	p.nextWithExpect(lexer.TokenTypeCloseCurlyBrackets, "Expected closing curly brackets")
+	p.nextWithExpect(lexer.TokenTypeCloseCurlyBrackets, errors.ErrExpectedCloseCurly)
 	return statements
 }
 
 func (p *Parser) parseArguments() []Expression {
-	p.nextWithExpect(lexer.TokenTypeOpenParentheses, "Expected opening parentheses")
+	p.nextWithExpect(lexer.TokenTypeOpenParentheses, errors.ErrExpectedOpenParen)
 	arguments := []Expression{}
 	for p.notEOF() && p.at().Type != lexer.TokenTypeCloseParentheses {
 		// Skip newlines
@@ -393,7 +407,7 @@ func (p *Parser) parseArguments() []Expression {
 		argument := p.parseExpression()
 		arguments = append(arguments, argument)
 	}
-	p.nextWithExpect(lexer.TokenTypeCloseParentheses, "Expected closing parentheses")
+	p.nextWithExpect(lexer.TokenTypeCloseParentheses, errors.ErrExpectedCloseParen)
 	return arguments
 }
 
@@ -415,8 +429,8 @@ func (p *Parser) parseObjectExpression() Expression {
 			p.next()
 			continue
 		}
-		key := p.nextWithExpect(lexer.TokenTypeIdentifier, "An identifier was expected here 👀").Literal
-		p.nextWithExpect(lexer.TokenTypeColon, "A colon was expected after the key :v")
+		key := p.nextWithExpect(lexer.TokenTypeIdentifier, errors.ErrExpectedIdentifier).Literal
+		p.nextWithExpect(lexer.TokenTypeColon, errors.ErrExpectedColon)
 		value := p.parseExpression()
 		properties = append(properties, Property{Key: key, Value: value})
 
@@ -426,7 +440,7 @@ func (p *Parser) parseObjectExpression() Expression {
 		}
 	}
 
-	p.nextWithExpect(lexer.TokenTypeCloseCurlyBrackets, "Expected closing curly brackets")
+	p.nextWithExpect(lexer.TokenTypeCloseCurlyBrackets, errors.ErrExpectedCloseCurly)
 	return &Object{Properties: properties}
 }
 
@@ -461,7 +475,7 @@ func (p *Parser) parseArrayExpression() Expression {
 		}
 	}
 
-	p.nextWithExpect(lexer.TokenTypeCloseSquareBrackets, "Expected closing square brackets")
+	p.nextWithExpect(lexer.TokenTypeCloseSquareBrackets, errors.ErrExpectedCloseSquare)
 	return &Array{Elements: elements}
 }
 
@@ -470,7 +484,7 @@ func (p *Parser) parseArrayExpression() Expression {
 func (p *Parser) parseArrayIndex(array Expression) Expression {
 	p.next() // consume the opening bracket
 	index := p.parseExpression()
-	p.nextWithExpect(lexer.TokenTypeCloseSquareBrackets, "Expected closing square bracket")
+	p.nextWithExpect(lexer.TokenTypeCloseSquareBrackets, errors.ErrExpectedCloseSquare)
 
 	return &ArrayIndex{
 		ArrayExpression: array,
@@ -482,7 +496,7 @@ func (p *Parser) parseArrayIndex(array Expression) Expression {
 // Examples: obj.name, person.address, str.len
 func (p *Parser) parseMemberAccess(object Expression) Expression {
 	p.next() // consume the dot
-	property := p.nextWithExpect(lexer.TokenTypeIdentifier, "Expected property name after dot").Literal
+	property := p.nextWithExpect(lexer.TokenTypeIdentifier, errors.ErrExpectedIdentifier).Literal
 
 	return &MemberAccess{
 		Object:   object,
@@ -491,7 +505,7 @@ func (p *Parser) parseMemberAccess(object Expression) Expression {
 }
 
 func (p *Parser) parseCallExpression(callee Expression) *CallExpression {
-	p.nextWithExpect(lexer.TokenTypeOpenParentheses, "Expected opening parentheses")
+	p.nextWithExpect(lexer.TokenTypeOpenParentheses, errors.ErrExpectedOpenParen)
 
 	args := []Expression{}
 
@@ -512,7 +526,7 @@ func (p *Parser) parseCallExpression(callee Expression) *CallExpression {
 		}
 	}
 
-	p.nextWithExpect(lexer.TokenTypeCloseParentheses, "Expected closing parentheses")
+	p.nextWithExpect(lexer.TokenTypeCloseParentheses, errors.ErrExpectedCloseParen)
 
 	return &CallExpression{
 		Type:   NodeTypeCallExpression,
@@ -526,7 +540,7 @@ func (p *Parser) parseIfStatement() *IfStatement {
 
 	condition := p.parseExpression()
 
-	p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets after if condition")
+	p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 	body := p.parseBlock()
 
 	ifStatement := &IfStatement{
@@ -544,7 +558,7 @@ func (p *Parser) parseIfStatement() *IfStatement {
 		if p.at().Type == lexer.TokenTypeIf {
 			p.next() // consume 'if'
 			elseifCondition := p.parseExpression()
-			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets after elseif condition")
+			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 			elseifBody := p.parseBlock()
 
 			elseifClause := ElseIfClause{
@@ -554,7 +568,7 @@ func (p *Parser) parseIfStatement() *IfStatement {
 			ifStatement.ElseIfs = append(ifStatement.ElseIfs, elseifClause)
 		} else {
 			// It's an else clause
-			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets after else")
+			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 			ifStatement.ElseBody = p.parseBlock()
 			break
 		}
@@ -591,12 +605,12 @@ func (p *Parser) parseLoopStatement() *LoopStatement {
 
 			// Check if there's an optional increment
 			var increment Expression
-			if p.at().Type == lexer.TokenTypeSemicolon {
-				p.next() // consume semicolon
+			if p.at().Type == lexer.TokenTypeColon {
+				p.next() // consume colon
 				increment = p.parseExpression()
 			}
 
-			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets")
+			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 			body := p.parseBlock()
 
 			return &LoopStatement{
@@ -608,7 +622,7 @@ func (p *Parser) parseLoopStatement() *LoopStatement {
 			}
 		} else {
 			// For-each loop: loop element from arr { }
-			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets")
+			p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 			body := p.parseBlock()
 
 			return &LoopStatement{
@@ -622,7 +636,7 @@ func (p *Parser) parseLoopStatement() *LoopStatement {
 
 	// Traditional condition-based loop
 	condition := p.parseExpression()
-	p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, "Expected opening curly brackets")
+	p.nextWithExpect(lexer.TokenTypeOpenCurlyBrackets, errors.ErrExpectedOpenCurly)
 	body := p.parseBlock()
 
 	return &LoopStatement{

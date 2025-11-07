@@ -101,7 +101,7 @@ func loadAndParseFile(filePath string, visited map[string]bool) ([]parser.Statem
 
 	// Parse the file
 	p := parser.NewParser(nil)
-	program := p.ProduceAST(string(sourceCode))
+	program := p.ProduceASTWithFilename(string(sourceCode), filePath)
 
 	// Get the directory of this file for resolving its imports
 	fileDir := filepath.Dir(filePath)

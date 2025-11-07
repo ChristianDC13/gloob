@@ -2,29 +2,39 @@ package scope
 
 import (
 	"fmt"
-	"gloob-interpreter/internal/colors"
+	"gloob-interpreter/internal/errors"
+	"gloob-interpreter/internal/lexer"
 	"gloob-interpreter/internal/values"
-	"os"
 )
 
 type Scope struct {
-	parent    *Scope
-	variables map[string]values.RuntimeValue
-	constants map[string]struct{}
+	parent     *Scope
+	variables  map[string]values.RuntimeValue
+	constants  map[string]struct{}
+	sourceCode string // Source code for error reporting
 }
 
 func NewScope(parent *Scope) *Scope {
-	return &Scope{
+	scope := &Scope{
 		parent:    parent,
 		variables: make(map[string]values.RuntimeValue),
 		constants: make(map[string]struct{}),
 	}
+	// Inherit source code from parent if available
+	if parent != nil {
+		scope.sourceCode = parent.sourceCode
+	}
+	return scope
+}
+
+// SetSourceCode sets the source code for error reporting
+func (s *Scope) SetSourceCode(sourceCode string) {
+	s.sourceCode = sourceCode
 }
 
 func (s *Scope) Declare(name string, value values.RuntimeValue, isConstant bool) values.RuntimeValue {
 	if _, ok := s.variables[name]; ok {
-		fmt.Printf("Variable %s already declared\n", name)
-		os.Exit(1)
+		errors.RuntimeError(nil, "", fmt.Sprintf(errors.ErrVariableAlreadyDeclared, name))
 		return nil
 	}
 	if isConstant {
@@ -36,14 +46,12 @@ func (s *Scope) Declare(name string, value values.RuntimeValue, isConstant bool)
 
 func (s *Scope) Assign(name string, value values.RuntimeValue) values.RuntimeValue {
 	scope := s.Resolve(name)
-	if _, ok := scope.constants[name]; ok {
-		fmt.Printf("Constant %s cannot be assigned to because it is, how can i say it to you? It is a constant 😒\n", colors.Red(name))
-		os.Exit(1)
+	if scope == nil {
+		errors.RuntimeError(nil, "", fmt.Sprintf(errors.ErrVariableNotFound, name))
 		return nil
 	}
-	if scope == nil {
-		fmt.Printf("Variable %s not found. Are you sure you typed it correctly? 🤔\n", colors.Red(name))
-		os.Exit(1)
+	if _, ok := scope.constants[name]; ok {
+		errors.RuntimeError(nil, "", fmt.Sprintf(errors.ErrConstantCannotBeAssigned, name))
 		return nil
 	}
 	scope.variables[name] = value
@@ -59,22 +67,33 @@ func (s *Scope) Resolve(name string) *Scope {
 		return s.parent.Resolve(name)
 	}
 
-	fmt.Printf("Variable %s not found. Are you sure you typed it correctly? 🤔\n", colors.Red(name))
-	os.Exit(1)
-	return nil
+	return nil // Don't error here, let the caller handle it
 }
 
 func (s *Scope) Get(name string) values.RuntimeValue {
 	scope := s.Resolve(name)
 	if scope == nil {
-		fmt.Printf("Variable %s not found. Are you sure you typed it correctly? 🤔\n", colors.Red(name))
-		os.Exit(1)
+		errors.RuntimeError(nil, "", fmt.Sprintf(errors.ErrVariableNotFound, name))
 		return nil
 	}
 	value := scope.variables[name]
 	if value == nil {
-		fmt.Printf("Variable %s is not initialized. Are you sure you declared it? 🤔\n", colors.Red(name))
-		os.Exit(1)
+		errors.RuntimeError(nil, "", fmt.Sprintf(errors.ErrVariableNotInitialized, name))
+		return nil
+	}
+	return value
+}
+
+// GetWithToken gets a variable value and reports errors with token information
+func (s *Scope) GetWithToken(name string, token *lexer.Token) values.RuntimeValue {
+	scope := s.Resolve(name)
+	if scope == nil {
+		errors.RuntimeError(token, s.sourceCode, fmt.Sprintf(errors.ErrVariableNotFound, name))
+		return nil
+	}
+	value := scope.variables[name]
+	if value == nil {
+		errors.RuntimeError(token, s.sourceCode, fmt.Sprintf(errors.ErrVariableNotInitialized, name))
 		return nil
 	}
 	return value

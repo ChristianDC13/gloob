@@ -59,6 +59,5 @@ const (
 	TokenTypeOff      TokenType = "OFF"
 
 	// Special tokens
-	TokenTypePrint TokenType = "PRINT"
-	TokenTypeEOF   TokenType = "EOF"
+	TokenTypeEOF TokenType = "EOF"
 )

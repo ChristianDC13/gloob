@@ -171,12 +171,12 @@ loop i from 1 to 100 {
 }
 
 // Range with increment
-loop i from 0 to 10; 2 {
+loop i from 0 to 10: 2 {
     println(i)  // 0, 2, 4, 6, 8, 10
 }
 
 // Backward loop with negative increment
-loop i from 10 to 0; -2 {
+loop i from 10 to 0: -2 {
     println(i)  // 10, 8, 6, 4, 2, 0
 }
 

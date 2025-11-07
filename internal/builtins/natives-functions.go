@@ -63,7 +63,7 @@ func PrintFunction(args []values.RuntimeValue, scope interface{}) values.Runtime
 		}
 		fmt.Print(arg)
 	}
-	fmt.Print("\n")
+	// fmt.Print("\n")
 	return &values.NullValue{Type: parser.NodeTypeNull}
 }
 

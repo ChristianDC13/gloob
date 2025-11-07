@@ -3,28 +3,34 @@ package lexer
 import "unicode"
 
 type Token struct {
-	Type    TokenType
-	Literal string
-	Line    int
-	Column  int
+	Type        TokenType
+	Literal     string
+	Line        int
+	ColumnStart int
+	ColumnEnd   int
+	Filename    string
 }
 
-func CaptureToken(literal string, tokenType TokenType, line int, column int) Token {
+func CaptureToken(literal string, tokenType TokenType, line int, columnStart int, columnEnd int, filename string) Token {
 	return Token{
-		Type:    tokenType,
-		Literal: literal,
-		Line:    line,
-		Column:  column,
+		Type:        tokenType,
+		Literal:     literal,
+		Line:        line,
+		ColumnStart: columnStart,
+		ColumnEnd:   columnEnd,
+		Filename:    filename,
 	}
 }
 
 type Lexer struct {
-	input string
+	input    string
+	filename string
 }
 
-func NewLexer(input string) *Lexer {
+func NewLexer(input string, filename string) *Lexer {
 	return &Lexer{
-		input: input,
+		input:    input,
+		filename: filename,
 	}
 }
 
@@ -37,22 +43,22 @@ func (l *Lexer) Tokenize() []Token {
 
 	for len(chars) > 0 {
 		ch := chars[0]
+		columnStart := column
 
 		// handle whitespace
 		if ch == ' ' || ch == '\t' || ch == '\r' {
 			chars = chars[1:]
+			column++
 			continue
 		}
 
 		if ch == '\n' {
-			tokens = append(tokens, CaptureToken("\n", TokenTypeNewline, line, column))
+			tokens = append(tokens, CaptureToken("\n", TokenTypeNewline, line, columnStart, column, l.filename))
 			line++
 			column = 1
 			chars = chars[1:]
 			continue
 		}
-
-		column++
 
 		tokenType := TokenTypeUnknown
 		literal := string(ch)
@@ -62,13 +68,14 @@ func (l *Lexer) Tokenize() []Token {
 			for len(chars) > 0 && (unicode.IsLetter(chars[0]) || unicode.IsDigit(chars[0])) {
 				literal += string(chars[0])
 				chars = chars[1:]
+				column++
 			}
 			if isKeyW, tokenType := isKeyword(literal); isKeyW {
-				tokens = append(tokens, CaptureToken(literal, tokenType, line, column))
+				tokens = append(tokens, CaptureToken(literal, tokenType, line, columnStart, column-1, l.filename))
 				continue
 			}
 			tokenType = TokenTypeIdentifier
-			tokens = append(tokens, CaptureToken(literal, tokenType, line, column))
+			tokens = append(tokens, CaptureToken(literal, tokenType, line, columnStart, column-1, l.filename))
 			continue
 		}
 
@@ -76,13 +83,15 @@ func (l *Lexer) Tokenize() []Token {
 		if ch == '-' && len(chars) > 1 && unicode.IsDigit(chars[1]) {
 			literal = string(ch)
 			chars = chars[1:] // consume the '-'
+			column++
 			// Continue to parse as number
 			for len(chars) > 0 && (unicode.IsDigit(chars[0]) || chars[0] == '.') {
 				literal += string(chars[0])
 				chars = chars[1:]
+				column++
 			}
 			tokenType = TokenTypeNumber
-			tokens = append(tokens, CaptureToken(literal, tokenType, line, column))
+			tokens = append(tokens, CaptureToken(literal, tokenType, line, columnStart, column-1, l.filename))
 			continue
 		}
 
@@ -91,9 +100,10 @@ func (l *Lexer) Tokenize() []Token {
 			for len(chars) > 0 && (unicode.IsDigit(chars[0]) || chars[0] == '.') {
 				literal += string(chars[0])
 				chars = chars[1:]
+				column++
 			}
 			tokenType = TokenTypeNumber
-			tokens = append(tokens, CaptureToken(literal, tokenType, line, column))
+			tokens = append(tokens, CaptureToken(literal, tokenType, line, columnStart, column-1, l.filename))
 			continue
 		}
 
@@ -102,21 +112,24 @@ func (l *Lexer) Tokenize() []Token {
 			quoteChar := ch
 			literal = ""
 			chars = chars[1:] // consume opening quote
+			column++
 
 			for len(chars) > 0 && chars[0] != quoteChar {
 				literal += string(chars[0])
 				chars = chars[1:]
+				column++
 			}
 
 			if len(chars) == 0 {
 				// Unterminated string
-				tokens = append(tokens, CaptureToken(literal, TokenTypeUnknown, line, column))
+				tokens = append(tokens, CaptureToken(literal, TokenTypeUnknown, line, columnStart, column-1, l.filename))
 				continue
 			}
 
 			chars = chars[1:] // consume closing quote
+			column++
 			tokenType = TokenTypeString
-			tokens = append(tokens, CaptureToken(literal, tokenType, line, column))
+			tokens = append(tokens, CaptureToken(literal, tokenType, line, columnStart, column-1, l.filename))
 			continue
 		}
 
@@ -127,6 +140,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = "=="
 				tokenType = TokenTypeEqualEqual
 				chars = chars[1:] // consume second =
+				column++
 			} else {
 				tokenType = TokenTypeEqual
 			}
@@ -136,6 +150,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = "!="
 				tokenType = TokenTypeNotEqual
 				chars = chars[1:] // consume =
+				column++
 			} else {
 				tokenType = TokenTypeExclamation
 			}
@@ -145,6 +160,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = ">="
 				tokenType = TokenTypeGreaterThanEqual
 				chars = chars[1:] // consume =
+				column++
 			} else {
 				tokenType = TokenTypeGreaterThan
 			}
@@ -154,6 +170,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = "<="
 				tokenType = TokenTypeLessThanEqual
 				chars = chars[1:] // consume =
+				column++
 			} else {
 				tokenType = TokenTypeLessThan
 			}
@@ -164,6 +181,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = "//"
 				tokenType = TokenTypeComment
 				chars = chars[1:] // consume /
+				column++
 			} else {
 				tokenType = TokenTypeOperator
 			}
@@ -192,6 +210,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = "&&"
 				tokenType = TokenTypeAnd
 				chars = chars[1:] // consume second &
+				column++
 			} else {
 				tokenType = TokenTypeAmpersand
 			}
@@ -200,6 +219,7 @@ func (l *Lexer) Tokenize() []Token {
 				literal = "||"
 				tokenType = TokenTypeOr
 				chars = chars[1:] // consume second |
+				column++
 			} else {
 				tokenType = TokenTypePipe
 			}
@@ -207,11 +227,12 @@ func (l *Lexer) Tokenize() []Token {
 			tokenType = TokenTypeUnknown
 		}
 
-		tokens = append(tokens, CaptureToken(literal, tokenType, line, column))
+		column++
+		tokens = append(tokens, CaptureToken(literal, tokenType, line, columnStart, column-1, l.filename))
 		chars = chars[1:]
 	}
 
-	tokens = append(tokens, CaptureToken("EOF", TokenTypeEOF, line, column))
+	tokens = append(tokens, CaptureToken("EOF", TokenTypeEOF, line, column, column, l.filename))
 
 	return tokens
 }
